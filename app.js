@@ -1,9 +1,29 @@
+function callToast(message,type,callback){
+    let bgColor;
+    if(type == 'success'){
+        bgColor =  "#33cc33"
+    }else if(type == 'warning'){
+        bgColor = '#e6e600'
+    }else if(type == "danger"){
+        bgColor = "#ff9980";
+    }
+        let Toast = Toastify({
+      text: message,
+      duration: 5000,
+      backgroundColor: bgColor
+    });
+    
+    Toast.showToast();
+}
+
 HTMLElement.prototype.autocompleter = function(obj = {
     url: false, 
-    type: function(){},
+    returnType: function(){},
     selected: function(obj){},
+    selectedId: null,
     }){
-    console.log(obj);
+    //console.log(obj);
+    this.autocomplete = "off";
 
     let list =  document.createElement('ul');
     obj.removeActive = function(){
@@ -16,9 +36,7 @@ HTMLElement.prototype.autocompleter = function(obj = {
         obj.selectedPosition = undefined;
         list.innerHTML = "";
     }
-    this.addEventListener('focusout',() =>{
-        obj.close();
-    })
+
     list.classList.add('list-group');
     list.style.zIndex = 2;
     list.style.position = "absolute";
@@ -60,6 +78,10 @@ HTMLElement.prototype.autocompleter = function(obj = {
             }
         }
         if(e.keyCode == 13){
+            if(obj.selectedPosition == undefined){
+                obj.selectedPosition = 0
+            }
+            e.preventDefault();
             obj.selected(obj.jsonData[obj.selectedPosition]);
             obj.close();
 
@@ -79,8 +101,10 @@ HTMLElement.prototype.autocompleter = function(obj = {
             if(this.value != ""){
             obj.response_data = [];
             json.forEach((i) => {
-               obj.response_data.push(obj.type(i));
+               obj.response_data.push(obj.returnType(i));
             })
+        
+        if(obj.response_data.length > 0){
         obj.response_data.forEach((el,index) => {
             let li = document.createElement('li');
             li.classList.add('list-group-item');
@@ -89,22 +113,35 @@ HTMLElement.prototype.autocompleter = function(obj = {
             list.appendChild(li);
             
         });
+        }else{
+            let li = document.createElement('li');
+            li.classList.add('list-group-item');
+            li.classList.add('disabled');
+            li.innerHTML = '<small>Não foram encontrados dados</small>';
+            list.appendChild(li);
+
+        }
         }
         let opt = list.childNodes;
         if(opt){
-           opt.forEach((i,index) => {
-               i.addEventListener('mouseover',()=>{
+           opt.forEach((item,index) => {
+                item.addEventListener('click',()=>{
+                obj.selected(obj.jsonData[index]);
+                obj.close();
+            });
+               item.addEventListener('mouseover',()=>{
                    obj.removeActive();
-                   i.classList.add('active');   
-               })
-               i.addEventListener('click',()=>{
-                   obj.selected(obj.jsonData[index]);
-                   obj.close();
-               })
+                   item.classList.add('active');   
+               });
+
            })
        }
         }).catch(err => {
             console.log(err);
+        });
+        this.addEventListener('focusout',() =>{
+            obj.close();
         })
+        
     })
 }
