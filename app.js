@@ -147,6 +147,8 @@ HTMLElement.prototype.autocompleter = function(obj = {
 }
 
 //Paginação de objetos(um array de objetos); deve ter tambem um array header com chave => valor para criar o cabeçalho da tabela
+//Esta pegando cada elemento.value para pegar o valor, pode pegar style para inserir na tabela e class tambem, porem todos tem que vir em casa elemento
+//Padrão bootstrap
 
 class Paginator{
     constructor(
@@ -156,17 +158,22 @@ class Paginator{
             this.listDiv = listDiv;
             this.pageDiv = pageDiv;
             this.done = false;
-            this.addSpinner();
-            listDiv.innerHTML = this.spinner;
+            this.sortedBy = {'sortBy':null,'sortOrder':null};
     }
     init(){
         const queryString = window.location.search;
         const urlParams = new URLSearchParams(queryString);
-        let page = 1;
-        if(urlParams.get('page')){
-            page = urlParams.get('page');
-        }
+        let page;
+        urlParams.get('page') ? page = urlParams.get('page') : page = 1;
+        urlParams.get('sortBy')  ? this.sortedBy.sortBy = urlParams.get('sortBy') : this.sortedBy.sortBy = null;
+        urlParams.get('sortOrder')  ? this.sortedBy.sortOrder = urlParams.get('sortOrder') : this.sortedBy.sortOrder = null;
         this.currentPage = page;
+        if(this.sortedBy.sortBy){
+            if(this.sortedBy.sortBy in this.headers){
+                this.sort(false);
+            }
+        }
+        page < 1 ? page = 1 : page;
         this.paginator(page);
         this.mountPages();
         this.list();
@@ -178,6 +185,9 @@ class Paginator{
           <span class="sr-only">Loading...</span>
         </div>
       </div>`;
+      this.pageDiv.style.display = 'none';
+      this.listDiv.innerHTML = this.spinner;
+
     }
     generatePagesArray(paginationRange = 12){
     let currentPage = this.currentPage
@@ -232,8 +242,10 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
 }
     removeSpinner(){
         this.listDiv.innerHTML = '';
+        this.pageDiv.style.display = '';
     }
     getDataAjax(url = window.location,callback = false ){
+        this.addSpinner();
         let headers = new Headers();
         headers.append('X-Requested-With','XMLHttpRequest');
         fetch(url,{
@@ -257,6 +269,7 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
     setData(data){
         this.data = data.data;
         this.headers = data.headers;
+        this.title = data.title;
         if(data.error){
             this.error = data.title;
             this.message = data.message;
@@ -267,7 +280,6 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
         json = json['data'];
         json = json.replace(/&quot;/g,'"');
         json = json.replace(/&amp;/g,'"');
-        console.log(json)
 
         json = JSON.parse(json);
         return json;
@@ -279,14 +291,16 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
         this.pageDiv = div;
     }
     paginator(current_page, per_page_items = 25) {
-        this.currentPage = current_page;
         let items = this.data;
-        let page = current_page || 1,
-        per_page = per_page_items || 10,
-        offset = (page - 1) * per_page,
-    
+        let offset
+        let paginatedItems;
+        let page = current_page || 1;
+        let per_page = per_page_items || 10;
+        let total_pages = Math.ceil(items.length / per_page);
+        page > total_pages ? page = total_pages : page;
+        offset = (page - 1) * per_page;
         paginatedItems = items.slice(offset).slice(0, per_page_items),
-        total_pages = Math.ceil(items.length / per_page);
+
         this.metaData =  {
             page: page,
             per_page: per_page,
@@ -296,8 +310,38 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
             total_pages: total_pages,
             data: paginatedItems
         };
+        this.currentPage = page
         this.pages = this.generatePagesArray();
-        this.changeUrl();
+        this.changeUrl('page',this.currentPage);
+    }
+
+    changeSortOrder(property)
+    {
+        this.sortedBy.sortBy = property
+        if(!this.sortedBy.sortOrder){
+            this.sortedBy.sortOrder = 'DESC'
+            return;
+        }
+            if(this.sortedBy.sortOrder == 'DESC'){
+                this.sortedBy.sortOrder = 'ASC';
+                return;
+            }
+            if(this.sortedBy.sortOrder = 'ASC'){
+                this.sortedBy.sortOrder = 'DESC'
+                return;
+            }
+    }
+
+    sort(refresh = true){
+        let property = this.sortedBy.sortBy;
+        if(this.sortedBy.sortOrder == 'DESC'){
+            this.data.sort((a, b) => (a[property].value < b[property].value) ? 1 : -1)
+        }else{
+            this.data.sort((a, b) => (a[property].value > b[property].value) ? 1 : -1)
+        }
+        if(refresh){
+            this.init();
+        }
     }
 
     list(){
@@ -309,28 +353,64 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
             this.pageDiv.innerHTML = '';
             return;
         }
+        document.getElementById('total-list-span').innerHTML = `<small>Total de ${this.title.plural}: ${this.metaData.total}</small>`
         let res = '';
         let headers = this.headers;
         let headerHtml = '<thead class="thead-dark"><tr>';
+        let style = '';
+        let cssClass = '';
+        let isDeleted;
+        let listener;
+        let arrow;
         for(const i in headers){
-            headerHtml += `<th>${headers[i]}</th>`
+            listener = '';
+            arrow = '';
+            if(i == this.sortedBy.sortBy){
+                if(this.sortedBy.sortOrder == 'DESC'){
+                    arrow = ' &#8595;'
+                }
+                if(this.sortedBy.sortOrder == 'ASC'){
+                    arrow = ' &#8593;'
+
+                }
+            }
+            if(i != 'user_default_actions'){
+                listener = `class="hover" data-sort="${i}" id="header-${headers[i]}"`
+            }
+            headerHtml += `<th ${listener}>${headers[i]}${arrow}</th>`
         }
         headerHtml += '</tr></thead>'
         list.innerHTML += headerHtml;
         for (const item in items) {
-            let isDeleted = '';
+            isDeleted = '';
+ 
             if('extra' in items[item]){
-                if(items[item]['extra'].deleted){
+                if(items[item]['extra'].value.deleted){
                     isDeleted = 'deleted'
                 }
             }
+            
             res += '<tr class="'+isDeleted+'">';
             for (const key in headers) {
-                res += `<td>${items[item][key]}</td>`
+                style = '';
+                cssClass = '';
+                if(items[item][key].hasOwnProperty('style')){
+                    style = items[item][key].style;    
+                }
+                if(items[item][key].hasOwnProperty('class')){
+                    cssClass = items[item][key].class
+                }
+
+                let title = '';
+                if(key != 'user_default_actions'){
+                    title = `title="${items[item][key].value}"`;
+                }
+                res += `<td ${cssClass} ${style} ${title} >${items[item][key].value}</td>`
             }
         res += '</tr>';
         }
         list.innerHTML += res;
+        fadeIn(list,'table')
         this.addPagesListener();
     }
     mountPages(){
@@ -356,7 +436,6 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
             </a>
           </li>`;
 
-
         for(let i = 0; i < len;i++){
             this.currentPage == this.pages[i] ? active = 'active' : active = '';
             typeof this.pages[i] == "number" ? disabled = '' : disabled = 'disabled';
@@ -364,12 +443,24 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
         }
         pageDiv.innerHTML = prevBtn + pagesResponse + nextBtn;
     }
-    changeUrl(){
+    changeUrl(param,value){
         var queryParams = new URLSearchParams(window.location.search);
-         queryParams.set("page", this.currentPage);
+         queryParams.set(param, value);
          history.replaceState(null, null, "?"+queryParams.toString());
     }
     addPagesListener(){
+        for(let i in this.headers){
+            let head = document.getElementById("header-"+this.headers[i]);
+            if(head){
+                head.addEventListener('click',(e)=>{
+                this.changeSortOrder(head.getAttribute('data-sort'));
+                this.changeUrl('sortBy',this.sortedBy.sortBy);
+                this.changeUrl('sortOrder',this.sortedBy.sortOrder);
+                this.sort();
+                
+            })
+        }
+        }
         let click = document.getElementsByClassName('next-item-click');
         let clickTotal = click.length;
         for(let i = 0; i < clickTotal;i++){
@@ -398,5 +489,21 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
                 this.list();            
             })
         }
+    }
+    setFormToAjax(form = document.getElementsByClassName('search-form')[0] ,url = window.location,callback = false){
+        form.addEventListener('submit',(e)=>{
+            e.preventDefault();
+            let data = new FormData(form);
+            for (let entry of data) {
+                this.changeUrl(entry[0],entry[1]);
+        }
+        if(callback){
+            this.getDataAjax(url,(val) => {
+                callback(val);
+            });
+            return;
+        }
+        this.getDataAjax(url);
+        })
     }
 }
