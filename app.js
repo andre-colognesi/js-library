@@ -146,10 +146,19 @@ HTMLElement.prototype.autocompleter = function(obj = {
     })
 }
 
-//Paginação de objetos(um array de objetos); deve ter tambem um array header com chave => valor para criar o cabeçalho da tabela
-//Esta pegando cada elemento.value para pegar o valor, pode pegar style para inserir na tabela e class tambem, porem todos tem que vir em casa elemento
-//Padrão bootstrap
+/*
+Forma de usar:
+@array header:
+    Um array de objetos chamado header onde header[nome_da_coluna].title = titulo da coluna, e header[nome_da_coluna].type = tipo de para fazer o sort(na verdade
+    só é utilizado o tipo date para ordenar por data)
+@array data:
+    Array de objetos com os itens da página, cada posição do array tem que conter um objeto com: nome_da_coluna(mesmo do header).value = valor.
+    opcional: {nome_da_coluna.style} estilo que sera aplicado em cada td
+Paginação de objetos(um array de objetos); deve ter tambem um array header com chave => valor para criar o cabeçalho da tabela
+Esta pegando cada elemento.value para pegar o valor, pode pegar style para inserir na tabela e class tambem, porem todos tem que vir em casa elemento
 
+Padrão bootstrap
+    */
 class Paginator{
     constructor(
         listDiv = document.getElementById('pagination-list'),
@@ -273,6 +282,9 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
         if(data.error){
             this.error = data.title;
             this.message = data.message;
+        }else{
+            this.message = null;
+            this.error = null;
         }
         this.init();
     };
@@ -332,12 +344,29 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
             }
     }
 
+    formatDate(date)
+    {
+        let pieces = date.split('/');
+        let seconds = pieces[2].split(':');
+        let year = pieces[2].split(" ")[0];
+        return new Date(year,pieces[1],pieces[0],seconds[0].split(' ')[1],seconds[1],seconds[2]);
+    }
+
     sort(refresh = true){
         let property = this.sortedBy.sortBy;
         if(this.sortedBy.sortOrder == 'DESC'){
-            this.data.sort((a, b) => (a[property].value < b[property].value) ? 1 : -1)
+
+            if(this.headers[property].type == 'date'){
+                this.data.sort((a, b) => (this.formatDate(b[property].value) < this.formatDate(a[property].value)) ? 1 : -1)
+            }else{
+                this.data.sort((a, b) => (a[property].value < b[property].value) ? 1 : -1)
+            }
         }else{
-            this.data.sort((a, b) => (a[property].value > b[property].value) ? 1 : -1)
+            if(this.headers[property].type == 'date'){
+                this.data.sort((a, b) => (this.formatDate(b[property].value) > this.formatDate(a[property].value)) ? 1 : -1)
+            }else{
+                this.data.sort((a, b) => (a[property].value > b[property].value) ? 1 : -1)
+            }
         }
         if(refresh){
             this.init();
@@ -375,9 +404,9 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
                 }
             }
             if(i != 'user_default_actions'){
-                listener = `class="hover" data-sort="${i}" id="header-${headers[i]}"`
+                listener = `class="hover" data-sort="${i}" id="header-${i}"`
             }
-            headerHtml += `<th ${listener}>${headers[i]}${arrow}</th>`
+            headerHtml += `<th ${listener}>${headers[i].title}${arrow}</th>`
         }
         headerHtml += '</tr></thead>'
         list.innerHTML += headerHtml;
@@ -450,14 +479,13 @@ calculatePageNumber(i, currentPage, paginationRange, totalPages){
     }
     addPagesListener(){
         for(let i in this.headers){
-            let head = document.getElementById("header-"+this.headers[i]);
+            let head = document.getElementById("header-"+i);
             if(head){
                 head.addEventListener('click',(e)=>{
                 this.changeSortOrder(head.getAttribute('data-sort'));
                 this.changeUrl('sortBy',this.sortedBy.sortBy);
                 this.changeUrl('sortOrder',this.sortedBy.sortOrder);
                 this.sort();
-                
             })
         }
         }
