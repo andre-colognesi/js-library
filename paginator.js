@@ -1,3 +1,16 @@
+/*
+Forma de usar:
+@array header:
+    Um array de objetos chamado header onde header[nome_da_coluna].title = titulo da coluna, e header[nome_da_coluna].type = tipo de para fazer o sort(na verdade
+    só é utilizado o tipo date para ordenar por data)
+@array data:
+    Array de objetos com os itens da página, cada posição do array tem que conter um objeto com: nome_da_coluna(mesmo do header).value = valor.
+    opcional: {nome_da_coluna.style} estilo que sera aplicado em cada td
+Paginação de objetos(um array de objetos); deve ter tambem um array header com chave => valor para criar o cabeçalho da tabela
+Esta pegando cada elemento.value para pegar o valor, pode pegar style para inserir na tabela e class tambem, porem todos tem que vir em casa elemento
+Padrão bootstrap
+    */
+
 class Paginator{
     constructor(
         listDiv = document.getElementById('pagination-list'),
